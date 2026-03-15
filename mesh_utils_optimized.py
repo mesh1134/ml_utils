@@ -1,15 +1,24 @@
 import numpy as np
-from sklearn.ensemble import (
-    RandomForestClassifier, AdaBoostClassifier,
-    RandomForestRegressor, AdaBoostRegressor
-)
+
+
+# Metrics
 from sklearn.metrics import (
     accuracy_score, roc_auc_score, f1_score,
     mean_squared_error, r2_score, mean_absolute_error
 )
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.svm import LinearSVC
+
+# Models
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from xgboost import XGBClassifier, XGBRegressor
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    AdaBoostClassifier,
+    RandomForestRegressor,
+    AdaBoostRegressor
+)
 
 # Metric scoring map
 scoring_map = {
@@ -26,13 +35,23 @@ scoring_map = {
 
 # Model configurations with larger parameter spaces for RandomizedSearchCV
 classification_models = {
+    "Logistic Regression": (
+        LogisticRegression(solver="liblinear", random_state=42, class_weight="balanced"),
+        {"C": [0.001, 0.01, 0.1, 1, 10, 100]}
+    ),
     "decision_tree": (
         DecisionTreeClassifier(random_state=42),
-        {"max_depth": [3, 5, 10, 20, None], "min_samples_split": [2, 5, 10], "criterion": ["gini", "entropy"]}
+        {"max_depth": [3, 5, 10, 20, None],
+         "min_samples_split": [2, 5, 10],
+         "criterion": ["gini", "entropy"]
+         }
     ),
     "random_forest": (
-        RandomForestClassifier(random_state=42, n_jobs=-1),
-        {"n_estimators": [50, 100, 200], "max_depth": [5, 10, 20, None], "max_features": ["sqrt", "log2"]}
+        RandomForestClassifier(random_state=42, n_jobs=-1, class_weight="balanced"),
+        {"n_estimators": [50, 100, 200],
+         "max_depth": [5, 10, 20, None],
+         "max_features": ["sqrt", "log2"]
+         }
     ),
     "xgboost": (
         XGBClassifier(eval_metric='logloss', n_jobs=-1),
@@ -42,6 +61,12 @@ classification_models = {
     "adaboost": (
         AdaBoostClassifier(random_state=42),
         {"n_estimators": [50, 100, 200], "learning_rate": [0.01, 0.1, 0.5, 1.0]}
+    ),
+    "Support Vector Machine (SVM)": (
+        LinearSVC(
+            class_weight="balanced",
+        ),
+        {"C": [0.001, 0.01, 0.1, 1, 10, 100]}
     )
 }
 
@@ -52,7 +77,8 @@ regression_models = {
     ),
     "random_forest": (
         RandomForestRegressor(random_state=42, n_jobs=-1),
-        {"n_estimators": [50, 100, 200], "max_depth": [5, 10, 20, None], "max_features": ["sqrt", "log2"]}
+        {"n_estimators": [50, 100, 200], "max_depth": [5, 10, 20, None],
+         "max_features": ["sqrt", "log2"]}
     ),
     "xgboost": (
         XGBRegressor(n_jobs=-1),
@@ -64,6 +90,7 @@ regression_models = {
         {"n_estimators": [50, 100, 200], "learning_rate": [0.01, 0.1, 0.5, 1.0]}
     )
 }
+
 
 def _calculate_test_score(model, metric, x_test, y_test, y):
     """Calculate test score based on metric type."""
@@ -89,17 +116,12 @@ def _calculate_test_score(model, metric, x_test, y_test, y):
 
 def find_best_model(x, y, problem_type, metric, n_iter=10):
     """
-    Train multiple models using GridSearchCV (Exhaustive Search).
-    Best for smaller datasets and academic demonstrations.
+    Training multiple models using RandomizedSearchCV.
 
     Parameters:
     - x, y: Features and Target
     - problem_type: 'classification' or 'regression'
-    - metric: 'accuracy', 'roc_auc', 'f1', 'mse', 'r2', etc.
-    - n_iter: Number of parameter combinations to sample (default=10)
-
-    Returns:
-    - dict: Contains best_model_name, best_params, CV_score, Test_score, trained_model
+    - Metric: 'accuracy', 'roc_auc', 'f1', 'mse', 'r2', etc.
     """
     problem_type = problem_type.lower()
     metric = metric.lower()
