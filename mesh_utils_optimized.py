@@ -6,7 +6,7 @@ from sklearn.metrics import (
     accuracy_score, roc_auc_score, f1_score,
     mean_squared_error, r2_score, mean_absolute_error
 )
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import train_test_split, RandomizedSearchCV, ParameterGrid
 from sklearn.svm import LinearSVC
 
 # Models
@@ -36,7 +36,7 @@ scoring_map = {
 # Model configurations with larger parameter spaces for RandomizedSearchCV
 classification_models = {
     "Logistic Regression": (
-        LogisticRegression(solver="liblinear", random_state=42, class_weight="balanced"),
+        LogisticRegression(solver="lbfgs", max_iter=2000, random_state=42, class_weight="balanced"),
         {"C": [0.001, 0.01, 0.1, 1, 10, 100]}
     ),
     "decision_tree": (
@@ -150,8 +150,9 @@ def find_best_model(x, y, problem_type, metric, n_iter=10):
     }
 
     for name, (model, params) in models.items():
+        n_params = len(ParameterGrid(params))
         search = RandomizedSearchCV(
-            model, params, n_iter=n_iter, cv=5,
+            model, params, n_iter=min(n_iter, n_params), cv=5,
             scoring=sklearn_scoring, n_jobs=-1, random_state=42, verbose=0
         )
 
@@ -194,10 +195,10 @@ if __name__ == "__main__":
     )
 
     result_clf = find_best_model(X_clf, y_clf, 'classification', 'accuracy', n_iter=10)
-    print(f"\n✓ Best Model: {result_clf['best_model_name']}")
-    print(f"✓ CV Score: {result_clf['CV_score']:.4f}")
-    print(f"✓ Test Score: {result_clf['Test_score']:.4f}")
-    print(f"✓ Best Params: {result_clf['best_params']}")
+    print(f"\n- Best Model: {result_clf['best_model_name']}")
+    print(f"- CV Score: {result_clf['CV_score']:.4f}")
+    print(f"- Test Score: {result_clf['Test_score']:.4f}")
+    print(f"- Best Params: {result_clf['best_params']}")
 
     # Test 2: Regression
     print("\n\n[Test 2] Regression with synthetic data")
@@ -208,10 +209,10 @@ if __name__ == "__main__":
     )
 
     result_reg = find_best_model(X_reg, y_reg, 'regression', 'r2', n_iter=10)
-    print(f"\n✓ Best Model: {result_reg['best_model_name']}")
-    print(f"✓ CV Score: {result_reg['CV_score']:.4f}")
-    print(f"✓ Test Score: {result_reg['Test_score']:.4f}")
-    print(f"✓ Best Params: {result_reg['best_params']}")
+    print(f"\n- Best Model: {result_reg['best_model_name']}")
+    print(f"- CV Score: {result_reg['CV_score']:.4f}")
+    print(f"- Test Score: {result_reg['Test_score']:.4f}")
+    print(f"- Best Params: {result_reg['best_params']}")
 
     print("\n" + "=" * 60)
     print("All tests passed! Functions work correctly.")
