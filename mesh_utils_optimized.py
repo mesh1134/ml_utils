@@ -36,7 +36,7 @@ scoring_map = {
 # Model configurations with larger parameter spaces for RandomizedSearchCV
 classification_models = {
     "Logistic Regression": (
-        LogisticRegression(solver="lbfgs", max_iter=2000, random_state=42, class_weight="balanced"),
+        LogisticRegression(solver="saga", max_iter=12000, random_state=42, class_weight="balanced"),
         {"C": [0.001, 0.01, 0.1, 1, 10, 100]}
     ),
     "decision_tree": (
@@ -114,7 +114,7 @@ def _calculate_test_score(model, metric, x_test, y_test, y):
     return metric_calculators.get(metric, lambda: 0.0)()
 
 
-def find_best_model(x, y, problem_type, metric, n_iter=10):
+def find_best_model(x, y, problem_type, metric, n_iter=10, x_test=None, y_test=None, cv=5):
     """
     Training multiple models using RandomizedSearchCV.
 
@@ -129,11 +129,14 @@ def find_best_model(x, y, problem_type, metric, n_iter=10):
     if problem_type not in {"classification", "regression"}:
         raise ValueError("Problem type must be 'classification' or 'regression'")
 
-    # Split data with stratification for classification
-    stratify = y if problem_type == "classification" else None
-    x_train, x_test, y_train, y_test = train_test_split(
-        x, y, test_size=0.2, random_state=42, stratify=stratify
-    )
+    # Split data with stratification for classification unless an external holdout is supplied
+    if x_test is None or y_test is None:
+        stratify = y if problem_type == "classification" else None
+        x_train, x_test, y_train, y_test = train_test_split(
+            x, y, test_size=0.2, random_state=42, stratify=stratify
+        )
+    else:
+        x_train, y_train = x, y
 
     # Select models based on the problem type
     models = classification_models if problem_type == "classification" else regression_models
@@ -152,7 +155,7 @@ def find_best_model(x, y, problem_type, metric, n_iter=10):
     for name, (model, params) in models.items():
         n_params = len(ParameterGrid(params))
         search = RandomizedSearchCV(
-            model, params, n_iter=min(n_iter, n_params), cv=5,
+            model, params, n_iter=min(n_iter, n_params), cv=cv,
             scoring=sklearn_scoring, n_jobs=-1, random_state=42, verbose=0
         )
 
@@ -203,10 +206,11 @@ if __name__ == "__main__":
     # Test 2: Regression
     print("\n\n[Test 2] Regression with synthetic data")
     print("-" * 60)
-    X_reg, y_reg = make_regression(
+    regression_data = make_regression(
         n_samples=500, n_features=10, n_informative=5,
-        noise=10, random_state=42
+        noise=10, random_state=42, coef=False
     )
+    X_reg, y_reg = regression_data[0], regression_data[1]
 
     result_reg = find_best_model(X_reg, y_reg, 'regression', 'r2', n_iter=10)
     print(f"\n- Best Model: {result_reg['best_model_name']}")
