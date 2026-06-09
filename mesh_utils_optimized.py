@@ -36,7 +36,7 @@ scoring_map = {
 # Model configurations with larger parameter spaces for RandomizedSearchCV
 classification_models = {
     "Logistic Regression": (
-        LogisticRegression(solver="saga", max_iter=12000, random_state=42, class_weight="balanced"),
+        LogisticRegression(solver="lbfgs", max_iter=20000, random_state=42, class_weight="balanced"),
         {"C": [0.001, 0.01, 0.1, 1, 10, 100]}
     ),
     "decision_tree": (
@@ -123,6 +123,11 @@ def find_best_model(x, y, problem_type, metric, n_iter=10, x_test=None, y_test=N
     - problem_type: 'classification' or 'regression'
     - Metric: 'accuracy', 'roc_auc', 'f1', 'mse', 'r2', etc.
     """
+    import warnings
+    from sklearn.exceptions import ConvergenceWarning
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    
     problem_type = problem_type.lower()
     metric = metric.lower()
 
@@ -142,6 +147,7 @@ def find_best_model(x, y, problem_type, metric, n_iter=10, x_test=None, y_test=N
     models = classification_models if problem_type == "classification" else regression_models
     sklearn_scoring = scoring_map.get(metric, metric)
 
+
     print(f"Training models for {problem_type} using {metric} (RandomizedSearchCV)...")
 
     best_results = {
@@ -151,6 +157,9 @@ def find_best_model(x, y, problem_type, metric, n_iter=10, x_test=None, y_test=N
         "Test_score": 0,
         "trained_model": None
     }
+    
+    all_results = {}
+
 
     for name, (model, params) in models.items():
         n_params = len(ParameterGrid(params))
@@ -175,8 +184,15 @@ def find_best_model(x, y, problem_type, metric, n_iter=10, x_test=None, y_test=N
                     search.best_estimator_, sklearn_scoring, x_test, y_test, y
                 )
             })
+            
+        all_results[name] = {
+            "model": search.best_estimator_,
+            "CV_score": search.best_score_,
+            "Test_score": _calculate_test_score(search.best_estimator_, sklearn_scoring, x_test, y_test, y)
+        }
 
-    return best_results
+
+    return best_results, all_results
 
 
 # ============================================================================
